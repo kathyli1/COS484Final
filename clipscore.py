@@ -25,6 +25,8 @@ import generation_eval_utils
 import pprint
 import warnings
 from packaging import version
+import dill as pickle
+
 
 
 def parse_args():
@@ -84,12 +86,18 @@ class CLIPImageDataset(torch.utils.data.Dataset):
         self.data = data
         # only 224x224 ViT-B/32 supported for now
         self.preprocess = self._transform_test(224)
+    
+    def func(self, image):
+        return image.convert("RGB")
 
     def _transform_test(self, n_px):
         return Compose([
             Resize(n_px, interpolation=Image.BICUBIC),
             CenterCrop(n_px),
-            lambda image: image.convert("RGB"),
+            #lambda image: image.convert("RGB"),
+                        #lambda image: image.convert("RGB"),
+            self.func,
+
             ToTensor(),
             Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         ])
@@ -97,14 +105,27 @@ class CLIPImageDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         c_data = self.data[idx]
         image = Image.open(c_data)
+        #image.show()
+        width, height = image.size
+        #img1 = img.crop((left, top, right, bottom)) #..torchussion.transforms.random_crop
+        img1 = image.crop((width//2, height//2, width, height))
+        img2 = image.crop((0, 0, width//2, height//2))
+        img3 = image.crop((width//2, 0, width, height//2))
+        img4 = image.crop((0, height//2, width//2, height))
         image = self.preprocess(image)
-        return {'image':image}
-
+        img1 = self.preprocess(img1)
+        img2 = self.preprocess(img2)
+        img3 = self.preprocess(img3)
+        img4 = self.preprocess(img4)
+        #img4.show()
+        #return {'image':image}
+        return {'image':[img1,img2,img3,img4]}
+    
     def __len__(self):
         return len(self.data)
 
 
-def extract_all_captions(captions, model, device, batch_size=256, num_workers=8):
+def extract_all_captions(captions, model, device, batch_size=256, num_workers=1):
     data = torch.utils.data.DataLoader(
         CLIPCapDataset(captions),
         batch_size=batch_size, num_workers=num_workers, shuffle=False)
@@ -117,18 +138,28 @@ def extract_all_captions(captions, model, device, batch_size=256, num_workers=8)
     return all_text_features
 
 
-def extract_all_images(images, model, device, batch_size=64, num_workers=8):
+def extract_all_images(images, model, device, batch_size=64, num_workers=1):
     data = torch.utils.data.DataLoader(
         CLIPImageDataset(images),
         batch_size=batch_size, num_workers=num_workers, shuffle=False)
+
     all_image_features = []
     with torch.no_grad():
-        for b in tqdm.tqdm(data):
-            b = b['image'].to(device)
-            if device == 'cuda':
-                b = b.to(torch.float16)
-            all_image_features.append(model.encode_image(b).cpu().numpy())
-    all_image_features = np.vstack(all_image_features)
+        # for b in tqdm.tqdm(data):
+        #     print("b[image]", )
+        #     b = b['image'].to(device)
+        #     if device == 'cuda':
+        #         b = b.to(torch.float16)
+        #     all_image_features.append(model.encode_image(b).cpu().numpy())
+        for images in tqdm.tqdm(data):
+            im_feature_arr = []
+            for b in images['image']:
+                b = b.to(device)
+                if device == 'cuda':
+                    b = b.to(torch.float16)
+                im_feature_arr.append(model.encode_image(b).cpu().numpy())
+            all_image_features.append(im_feature_arr)
+        all_image_features = np.vstack(all_image_features)
     return all_image_features
 
 
