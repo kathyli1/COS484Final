@@ -25,7 +25,6 @@ import generation_eval_utils
 import pprint
 import warnings
 from packaging import version
-import dill as pickle
 
 
 
@@ -158,7 +157,40 @@ def extract_all_images(images, model, device, batch_size=64, num_workers=1):
                 if device == 'cuda':
                     b = b.to(torch.float16)
                 im_feature_arr.append(model.encode_image(b).cpu().numpy())
-            all_image_features.append(im_feature_arr)
+
+            # MAX feature - .7147
+            '''
+            features = im_feature_arr[0]
+            for arr in im_feature_arr:
+                for i in range(len(arr)):
+                    for j in range(len(arr[i])):
+                        features[i][j] = max(features[i][j], arr[i][j])
+            '''
+            
+            # MIN feature - .7227
+            '''
+            features = im_feature_arr[0]
+            for arr in im_feature_arr:
+                for i in range(len(arr)):
+                    for j in range(len(arr[i])):
+                        features[i][j] = min(features[i][j], arr[i][j])
+            '''
+
+            # MEAN feature - .7760
+            #'''
+            features = np.zeros((len(im_feature_arr[0]), len(im_feature_arr[0][0])))
+            num = 0
+            for arr in im_feature_arr:
+                num += 1
+                for i in range(len(arr)):
+                    for j in range(len(arr[i])):
+                        features[i][j] += arr[i][j]
+            for i in range(len(features)):
+                for j in range(len(features[i])):
+                    features[i][j] /= num
+            #'''
+
+            all_image_features.append(features)
         all_image_features = np.vstack(all_image_features)
     return all_image_features
 
