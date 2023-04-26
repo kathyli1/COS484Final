@@ -87,26 +87,24 @@ class CLIPImageDataset(torch.utils.data.Dataset):
 
     def func(self, image):
         return image.convert("RGB")
-
+    
     def _transform_test(self, n_px):
+        #crop here
         return Compose([
             Resize(n_px, interpolation=Image.BICUBIC),
             CenterCrop(n_px),
-            # lambda image: image.convert("RGB"),
-            # lambda image: image.convert("RGB"),
+            #lambda image: image.convert("RGB"),
             self.func,
-
             ToTensor(),
-            Normalize((0.48145466, 0.4578275, 0.40821073),
-                      (0.26862954, 0.26130258, 0.27577711)),
+            Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
         ])
 
     def __getitem__(self, idx):
         c_data = self.data[idx]
         image = Image.open(c_data)
-        # image.show()
+        #image.show()
         width, height = image.size
-        # img1 = img.crop((left, top, right, bottom)) #..torchussion.transforms.random_crop
+        #img1 = img.crop((left, top, right, bottom)) #..torchussion.transforms.random_crop
         img1 = image.crop((width//2, height//2, width, height))
         img2 = image.crop((0, 0, width//2, height//2))
         img3 = image.crop((width//2, 0, width, height//2))
@@ -116,15 +114,15 @@ class CLIPImageDataset(torch.utils.data.Dataset):
         img2 = self.preprocess(img2)
         img3 = self.preprocess(img3)
         img4 = self.preprocess(img4)
-        # img4.show()
-        # return {'image':image}
-        return {'image': [img1, img2, img3, img4]}
+        #img4.show()
+        return {'image':image}
+        #return {'image':[img1,img2,img3,img4]}
 
     def __len__(self):
         return len(self.data)
 
 
-def extract_all_captions(captions, model, device, batch_size=256, num_workers=1):
+def extract_all_captions(captions, model, device, batch_size=256, num_workers=8):
     data = torch.utils.data.DataLoader(
         CLIPCapDataset(captions),
         batch_size=batch_size, num_workers=num_workers, shuffle=False)
@@ -137,56 +135,44 @@ def extract_all_captions(captions, model, device, batch_size=256, num_workers=1)
     return all_text_features
 
 
-def extract_all_images(images, model, device, batch_size=64, num_workers=1):
+def extract_all_images(images, model, device, batch_size=64, num_workers=8):
     data = torch.utils.data.DataLoader(
-        CLIPImageDataset(images),
-        batch_size=batch_size, num_workers=num_workers, shuffle=False)
-
+    CLIPImageDataset(images),
+    batch_size=batch_size, num_workers=num_workers, shuffle=False)
     all_image_features = []
     with torch.no_grad():
-        for images in tqdm.tqdm(data):
-            im_feature_arr = []
-            # Nika's testing here:
-            # MAX feature - .7147
-            '''
-            features = im_feature_arr[0]
-            for arr in im_feature_arr:
-                for i in range(len(arr)):
-                    for j in range(len(arr[i])):
-                        features[i][j] = max(features[i][j], arr[i][j])
-            '''
-            # MIN feature - .7227
-            '''
-            features = im_feature_arr[0]
-            for arr in im_feature_arr:
-                for i in range(len(arr)):
-                    for j in range(len(arr[i])):
-                        features[i][j] = min(features[i][j], arr[i][j])
-            '''
-            # MEAN feature - .7760
-            '''
-            features = np.zeros((len(im_feature_arr[0]), len(im_feature_arr[0][0])))
-            num = 0
-            for arr in im_feature_arr:
-                num += 1
-                for i in range(len(arr)):
-                    for j in range(len(arr[i])):
-                        features[i][j] += arr[i][j]
-            for i in range(len(features)):
-                for j in range(len(features[i])):
-                    features[i][j] /= num
-            '''
-            for b in images['image']:
-                b = b.to(device)
-                if device == 'cuda':
-                    b = b.to(torch.float16)
-                im_feature_arr.append(model.encode_image(b).cpu().numpy())
-
-            im_feature_arr = np.stack(im_feature_arr, axis=1)
-            all_image_features.append(im_feature_arr)
-        all_image_features = np.vstack(all_image_features)
-
+        for b in tqdm.tqdm(data):
+            b = b['image'].to(device)
+            if device == 'cuda':
+                b = b.to(torch.float16)
+            all_image_features.append(model.encode_image(b).cpu().numpy())
+    
+    all_image_features = np.vstack(all_image_features)
+    
     return all_image_features
+    # data = torch.utils.data.DataLoader(
+    #     CLIPImageDataset(images),
+    #     batch_size=batch_size, num_workers=num_workers, shuffle=False)
+
+    # all_image_features = []
+    # with torch.no_grad():
+    #     # for b in tqdm.tqdm(data):
+    #     #     print("b[image]", )
+    #     #     b = b['image'].to(device)
+    #     #     if device == 'cuda':
+    #     #         b = b.to(torch.float16)
+    #     #     all_image_features.append(model.encode_image(b).cpu().numpy())
+    #     for images in tqdm.tqdm(data):
+    #         im_feature_arr = []
+    #         for b in images['image']:
+    #             b = b.to(device)
+    #             if device == 'cuda':
+    #                 b = b.to(torch.float16)
+    #             im_feature_arr.append(model.encode_image(b).cpu().numpy())
+    #         all_image_features.append(im_feature_arr)
+
+    #     all_image_features = np.vstack(all_image_features)
+    # return all_image_features
 
 
 def get_clip_score(model, images, candidates, device, w=2.5):
@@ -201,32 +187,20 @@ def get_clip_score(model, images, candidates, device, w=2.5):
         images = extract_all_images(images, model, device)
 
     candidates = extract_all_captions(candidates, model, device)
-    candidates = np.expand_dims(candidates, 1)
 
-    # as of numpy 1.21, normalize doesn't work properly for float16
+    #as of numpy 1.21, normalize doesn't work properly for float16
     if version.parse(np.__version__) < version.parse('1.21'):
-        images = sklearn.preprocessing.normalize(images, axis=-1)
-        candidates = sklearn.preprocessing.normalize(candidates, axis=-1)
+        images = sklearn.preprocessing.normalize(images, axis=1)
+        candidates = sklearn.preprocessing.normalize(candidates, axis=1)
     else:
         warnings.warn(
             'due to a numerical instability, new numpy normalization is slightly different than paper results. '
             'to exactly replicate paper results, please use numpy version less than 1.21, e.g., 1.20.3.')
-        images = images / np.sqrt(np.sum(images**2, axis=-1, keepdims=True))
-        candidates = candidates / \
-            np.sqrt(np.sum(candidates**2, axis=-1, keepdims=True))
-
-    prod = images * candidates
-    # import pdb; pdb.set_trace() #how to debug
-    # make crop combining changes here
-    prod = prod.max(1)
-    per = w*np.clip(np.sum(prod, axis=1), 0, None)
-
-    # alternate way to test:
-    # prod = prod.max(1)
-    # sum = np.sum(prod, axis=-1)
-    # sum = sum.max(-1)
-    # per = w*np.clip(sum, 0, None)
-
+        images = images / np.sqrt(np.sum(images**2, axis=1, keepdims=True))
+        candidates = candidates / np.sqrt(np.sum(candidates**2, axis=1, keepdims=True))
+    
+    per = w*np.clip(np.sum(images * candidates, axis=1), 0, None)
+    import pdb; pdb.set_trace()
     return np.mean(per), per, candidates
 
 
@@ -247,17 +221,14 @@ def get_refonlyclipscore(model, references, candidates, device):
 
     if version.parse(np.__version__) < version.parse('1.21'):
         candidates = sklearn.preprocessing.normalize(candidates, axis=1)
-        flattened_refs = sklearn.preprocessing.normalize(
-            flattened_refs, axis=1)
+        flattened_refs = sklearn.preprocessing.normalize(flattened_refs, axis=1)
     else:
         warnings.warn(
             'due to a numerical instability, new numpy normalization is slightly different than paper results. '
             'to exactly replicate paper results, please use numpy version less than 1.21, e.g., 1.20.3.')
 
-        candidates = candidates / \
-            np.sqrt(np.sum(candidates**2, axis=1, keepdims=True))
-        flattened_refs = flattened_refs / \
-            np.sqrt(np.sum(flattened_refs**2, axis=1, keepdims=True))
+        candidates = candidates / np.sqrt(np.sum(candidates**2, axis=1, keepdims=True))
+        flattened_refs = flattened_refs / np.sqrt(np.sum(flattened_refs**2, axis=1, keepdims=True))
 
     cand_idx2refs = collections.defaultdict(list)
     for ref_feats, cand_idx in zip(flattened_refs, flattened_refs_idxs):
@@ -277,6 +248,7 @@ def get_refonlyclipscore(model, references, candidates, device):
 
 
 def main():
+
     args = parse_args()
 
     image_paths = [os.path.join(args.image_dir, path) for path in os.listdir(args.image_dir)
@@ -302,6 +274,7 @@ def main():
     model, transform = clip.load("ViT-B/32", device=device, jit=False)
     model.eval()
 
+    #problem
     image_feats = extract_all_images(
         image_paths, model, device, batch_size=64, num_workers=8)
 
@@ -314,8 +287,7 @@ def main():
         _, per_instance_text_text = get_refonlyclipscore(
             model, references, candidate_feats, device)
         # F-score
-        refclipscores = 2 * per_instance_image_text * per_instance_text_text / \
-            (per_instance_image_text + per_instance_text_text)
+        refclipscores = 2 * per_instance_image_text * per_instance_text_text / (per_instance_image_text + per_instance_text_text)
         scores = {image_id: {'CLIPScore': float(clipscore), 'RefCLIPScore': float(refclipscore)}
                   for image_id, clipscore, refclipscore in
                   zip(image_ids, per_instance_image_text, refclipscores)}
@@ -324,23 +296,20 @@ def main():
         scores = {image_id: {'CLIPScore': float(clipscore)}
                   for image_id, clipscore in
                   zip(image_ids, per_instance_image_text)}
-        print('CLIPScore: {:.4f}'.format(
-            np.mean([s['CLIPScore'] for s in scores.values()])))
+        
+        print('CLIPScore: {:.4f}'.format(np.mean([s['CLIPScore'] for s in scores.values()])))
 
     if args.references_json:
         if args.compute_other_ref_metrics:
-            other_metrics = generation_eval_utils.get_all_metrics(
-                references, candidates)
+            other_metrics = generation_eval_utils.get_all_metrics(references, candidates)
             for k, v in other_metrics.items():
                 if k == 'bleu':
                     for bidx, sc in enumerate(v):
                         print('BLEU-{}: {:.4f}'.format(bidx+1, sc))
                 else:
                     print('{}: {:.4f}'.format(k.upper(), v))
-        print('CLIPScore: {:.4f}'.format(
-            np.mean([s['CLIPScore'] for s in scores.values()])))
-        print('RefCLIPScore: {:.4f}'.format(
-            np.mean([s['RefCLIPScore'] for s in scores.values()])))
+        print('CLIPScore: {:.4f}'.format(np.mean([s['CLIPScore'] for s in scores.values()])))
+        print('RefCLIPScore: {:.4f}'.format(np.mean([s['RefCLIPScore'] for s in scores.values()])))
 
     if args.save_per_instance:
         with open(args.save_per_instance, 'w') as f:
