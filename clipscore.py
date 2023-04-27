@@ -13,7 +13,6 @@ import torch
 from PIL import Image
 from sklearn.preprocessing import normalize
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
-import torch
 import tqdm
 import numpy as np
 import sklearn.preprocessing
@@ -25,6 +24,7 @@ import generation_eval_utils
 import pprint
 import warnings
 from packaging import version
+import torchvision.transforms as T
 
 
 def parse_args():
@@ -104,21 +104,29 @@ class CLIPImageDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         c_data = self.data[idx]
         image = Image.open(c_data)
-        # image.show()
         width, height = image.size
-        # img1 = img.crop((left, top, right, bottom)) #..torchussion.transforms.random_crop
-        img1 = image.crop((width//2, height//2, width, height))
-        img2 = image.crop((0, 0, width//2, height//2))
-        img3 = image.crop((width//2, 0, width, height//2))
-        img4 = image.crop((0, height//2, width//2, height))
-        image = self.preprocess(image)
+        #random crop
+        transform = T.RandomResizedCrop((int(width*.9),int(height*.9)))
+        img1 = transform(image)
+        # img1.show()
         img1 = self.preprocess(img1)
-        img2 = self.preprocess(img2)
-        img3 = self.preprocess(img3)
-        img4 = self.preprocess(img4)
+
+        # img1 = img.crop((left, top, right, bottom)) 
+        # img1 = image.crop((width//2, height//2, width, height))
+        # img2 = image.crop((0, 0, width//2, height//2))
+        # img3 = image.crop((width//2, 0, width, height//2))
+        # img4 = image.crop((0, height//2, width//2, height))
+    
+        # preprocess
+        # image = self.preprocess(image)
+        # img1 = self.preprocess(img1)
+        # img2 = self.preprocess(img2)
+        # img3 = self.preprocess(img3)
+        # img4 = self.preprocess(img4)
         # img4.show()
         # return {'image':image}
-        return {'image': [img1, img2, img3, img4]}
+        # return {'image': [img1, img2, img3, img4]}
+        return {'image': [img1]}
 
     def __len__(self):
         return len(self.data)
