@@ -105,28 +105,33 @@ class CLIPImageDataset(torch.utils.data.Dataset):
         c_data = self.data[idx]
         image = Image.open(c_data)
         width, height = image.size
-        #random crop
-        transform = T.RandomResizedCrop((int(width*.9),int(height*.9)))
-        img1 = transform(image)
-        # img1.show()
-        img1 = self.preprocess(img1)
 
-        # img1 = img.crop((left, top, right, bottom)) 
-        # img1 = image.crop((width//2, height//2, width, height))
-        # img2 = image.crop((0, 0, width//2, height//2))
-        # img3 = image.crop((width//2, 0, width, height//2))
-        # img4 = image.crop((0, height//2, width//2, height))
-    
-        # preprocess
-        # image = self.preprocess(image)
-        # img1 = self.preprocess(img1)
-        # img2 = self.preprocess(img2)
-        # img3 = self.preprocess(img3)
-        # img4 = self.preprocess(img4)
-        # img4.show()
+        # original 
+        # imgage = self.preprocess(imgage)
         # return {'image':image}
-        # return {'image': [img1, img2, img3, img4]}
-        return {'image': [img1]}
+
+        # NEW: random crop with .9*width and .9*height
+        # transform1 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
+        # img1 = transform1(image)
+        # transform2 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
+        # img2 = transform2(image)
+        # transform3 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
+        # img3 = transform3(image)
+        # transform4 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
+        # img4 = transform4(image)
+
+        # NEW: a bunch of center crops
+        img1 = image.crop((int(width*.1), int(height*.1), int(width*.9), int(height*.9)))
+        img2 = image.crop((int(width*.2), int(height*.2), int(width*.8), int(height*.8)))
+        img3 = image.crop((int(width*.3), int(height*.3), int(width*.7), int(height*.7)))
+        img4 = image.crop((int(width*.4), int(height*.4), int(width*.6), int(height*.6)))
+    
+        img1 = self.preprocess(img1)
+        img2 = self.preprocess(img2)
+        img3 = self.preprocess(img3)
+        img4 = self.preprocess(img4)
+
+        return {'image': [img1, img2, img3, img4]}
 
     def __len__(self):
         return len(self.data)
