@@ -107,31 +107,46 @@ class CLIPImageDataset(torch.utils.data.Dataset):
         width, height = image.size
 
         # original 
-        # imgage = self.preprocess(imgage)
+        # image = self.preprocess(imgage)
         # return {'image':image}
 
         # NEW: random crop with .9*width and .9*height
-        # transform1 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
-        # img1 = transform1(image)
-        # transform2 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
-        # img2 = transform2(image)
-        # transform3 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
-        # img3 = transform3(image)
-        # transform4 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
-        # img4 = transform4(image)
+        images = []
+        transform1 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
+        img1 = transform1(image)
+        images.append(img1)
+        transform2 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
+        img2 = transform2(image)
+        images.append(img2)
+        transform3 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
+        img3 = transform3(image)
+        images.append(img3)
+        transform4 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
+        img4 = transform4(image)
+        images.append(img4)
 
         # NEW: a bunch of center crops
+        '''
+        images = []
         img1 = image.crop((int(width*.1), int(height*.1), int(width*.9), int(height*.9)))
         img2 = image.crop((int(width*.2), int(height*.2), int(width*.8), int(height*.8)))
         img3 = image.crop((int(width*.3), int(height*.3), int(width*.7), int(height*.7)))
-        img4 = image.crop((int(width*.4), int(height*.4), int(width*.6), int(height*.6)))
+        img4 = image.crop((int(width*.4), int(height*.4), int(width*.6), int(height*.6)))'''
     
-        img1 = self.preprocess(img1)
-        img2 = self.preprocess(img2)
-        img3 = self.preprocess(img3)
-        img4 = self.preprocess(img4)
+        for i in range(len(images)):
+            images[i] = self.preprocess(images[i])
 
-        return {'image': [img1, img2, img3, img4]}
+        '''    
+        img1 = self.preprocess(img1)
+        images.append(img1)
+        img2 = self.preprocess(img2)
+        images.append(img2)
+        img3 = self.preprocess(img3)
+        images.append(img3)
+        img4 = self.preprocess(img4)
+        images.append(img4)'''
+
+        return {'image': images}
 
     def __len__(self):
         return len(self.data)
@@ -195,7 +210,11 @@ def extract_all_images(images, model, device, batch_size=64, num_workers=1):
                     b = b.to(torch.float16)
                 im_feature_arr.append(model.encode_image(b).cpu().numpy())
 
+            # print(len(im_feature_arr))
+            # print(len(im_feature_arr[0]))
+            # print(len(im_feature_arr[0][0]))
             im_feature_arr = np.stack(im_feature_arr, axis=1)
+            # print(im_feature_arr.shape)
             all_image_features.append(im_feature_arr)
         all_image_features = np.vstack(all_image_features)
 
@@ -228,11 +247,23 @@ def get_clip_score(model, images, candidates, device, w=2.5):
         candidates = candidates / \
             np.sqrt(np.sum(candidates**2, axis=-1, keepdims=True))
 
+    # print(images.shape)
+    # print(candidates.shape)
     prod = images * candidates
     # import pdb; pdb.set_trace() #how to debug
     # make crop combining changes here
-    prod = prod.max(1)
-    per = w*np.clip(np.sum(prod, axis=1), 0, None)
+    #prod = prod.mean(1) # mean results in clipscore below 1
+    # print(prod.shape)
+    pers = []
+    for i in range(prod.shape[1]):
+        per = w*np.clip(np.sum(prod[:,i,:], axis=1), 0, None)
+        pers.append(per)
+
+    for i in range(len(pers)): # gets max crop clipscore
+        if pers[i][0] > per[0]:
+            per[0] = pers[i][0] 
+        if pers[i][1] > per[1]:
+            per[1] = pers[i][1] 
 
     # alternate way to test:
     # prod = prod.max(1)
@@ -316,7 +347,7 @@ def main():
     model.eval()
 
     image_feats = extract_all_images(
-        image_paths, model, device, batch_size=64, num_workers=8)
+        image_paths, model, device, batch_size=64, num_workers=1) #changed num_workers from 8 to 1 for weird data driver error
 
     # get image-text clipscore
     _, per_instance_image_text, candidate_feats = get_clip_score(
