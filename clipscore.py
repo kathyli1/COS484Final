@@ -15,6 +15,7 @@ from sklearn.preprocessing import normalize
 from torchvision.transforms import Compose, Resize, CenterCrop, ToTensor, Normalize
 import tqdm
 import numpy as np
+import random
 import sklearn.preprocessing
 import collections
 import os
@@ -105,39 +106,39 @@ class CLIPImageDataset(torch.utils.data.Dataset):
         c_data = self.data[idx]
         image = Image.open(c_data)
         width, height = image.size
+        images = []
 
         # original 
         # image = self.preprocess(imgage)
         # return {'image':image}
 
-        # NEW: random crop with .9*width and .9*height
+        # NEW: random crop with fixed size crop_size*width and crop_size*height
+        '''
+        crop_size = .9
+        for i in range(4):
+            transform = T.RandomResizedCrop((int(width*crop_size),int(height*crop_size)))
+            img = transform(image)
+            images.append(img)
+        '''
+
+        # NEW: Random crop with random-sized crops
         #'''
-        images = []
-        transform1 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
-        img1 = transform1(image)
-        images.append(img1)
-        transform2 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
-        img2 = transform2(image)
-        images.append(img2)
-        transform3 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
-        img3 = transform3(image)
-        images.append(img3)
-        transform4 = T.RandomResizedCrop((int(width*.9),int(height*.9)))
-        img4 = transform4(image)
-        images.append(img4)
+        for i in range(5):
+            rand_width = int((.75 + random.random() / 4) * width)
+            rand_height = int((.75 + random.random() / 4) * height)
+            transform = T.RandomResizedCrop((rand_width, rand_height))
+            img = transform(image)
+            images.append(img)
         #'''
 
-        # NEW: a bunch of center crops
+        # NEW: k center crops decreasing by crop_sz in size each time
         '''
-        images = []
-        img1 = image.crop((int(width*.1), int(height*.1), int(width*.9), int(height*.9)))
-        img2 = image.crop((int(width*.2), int(height*.2), int(width*.8), int(height*.8)))
-        img3 = image.crop((int(width*.3), int(height*.3), int(width*.7), int(height*.7)))
-        img4 = image.crop((int(width*.4), int(height*.4), int(width*.6), int(height*.6)))
-        images.append(img1)
-        images.append(img2)
-        images.append(img3)
-        images.append(img4)
+        k = 5
+        crop_sz = .1
+        for i in range(k):
+            crop = crop_sz * i
+            img = image.crop((int(width*crop), int(height*crop), int(width*(1-crop)), int(height*(1-crop))))
+            images.append(img)
         '''
     
         for i in range(len(images)):
@@ -201,6 +202,7 @@ def extract_all_images(images, model, device, batch_size=64, num_workers=1):
                 for j in range(len(features[i])):
                     features[i][j] /= num
             '''
+
             for b in images['image']:
                 b = b.to(device)
                 if device == 'cuda':
@@ -365,6 +367,11 @@ def main():
         scores = {image_id: {'CLIPScore': float(clipscore)}
                   for image_id, clipscore in
                   zip(image_ids, per_instance_image_text)}
+        
+        # prints individual clip scores for each image
+        #for s in scores.values():
+        #    print(s['CLIPScore'])
+        
         print('CLIPScore: {:.4f}'.format(
             np.mean([s['CLIPScore'] for s in scores.values()])))
 

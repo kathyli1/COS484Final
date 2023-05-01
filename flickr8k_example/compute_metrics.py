@@ -42,20 +42,20 @@ def compute_human_correlation(input_json, image_directory, tauvariant='c'):
             'If you\'re reporting results on CPU, please note this when you report.')
     model, transform = clip.load("ViT-B/32", device=device, jit=False)
     model.eval()
-
+    
     image_feats = clipscore.extract_all_images(
         images, model, device, batch_size=64, num_workers=8)
-
+    
     # get image-text clipscore
     _, per_instance_image_text, candidate_feats = clipscore.get_clip_score(
         model, image_feats, candidates, device)
-
+    
     # get text-text clipscore
     _, per_instance_text_text = clipscore.get_refonlyclipscore(
             model, refs, candidate_feats, device)
-
+    
     # F-score
-    refclipscores = 2 * per_instance_image_text * per_instance_text_text / (per_instance_image_text + per_instance_text_text)
+    refclipscores = 2 * per_instance_image_text * per_instance_text_text / (per_instance_image_text + per_instance_text_text) 
     other_metrics = generation_eval_utils.get_all_metrics(refs, candidates, return_per_cap=True)
 
     print('CLIPScore Tau-{}: {:.3f}'.format(tauvariant, 100*scipy.stats.kendalltau(per_instance_image_text, human_scores, variant=tauvariant)[0]))
