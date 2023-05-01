@@ -346,7 +346,7 @@ def main():
     model.eval()
 
     image_feats = extract_all_images(
-        image_paths, model, device, batch_size=64, num_workers=1) #changed num_workers from 8 to 1 for weird data driver error
+        image_paths, model, device, batch_size=64, num_workers=8) #changed num_workers from 8 to 1 for weird data driver error
 
     # get image-text clipscore
     _, per_instance_image_text, candidate_feats = get_clip_score(
