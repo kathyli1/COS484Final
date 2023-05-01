@@ -264,6 +264,19 @@ def get_clip_score(model, images, candidates, device, w=2.5):
         if pers[i][1] > per[1]:
             per[1] = pers[i][1] 
 
+    # gets the min crop clipscore
+    # for i in range(len(pers)):
+    #     if pers[i][0] < per[0]:
+    #         per[0] = pers[i][0] 
+    #     if pers[i][1] < per[1]:
+    #         per[1] = pers[i][1] 
+
+    # gets the median crop clipscore
+    # pers_zero = [item[0] for item in pers]
+    # pers_one = [item[1] for item in pers]
+    # per[0] = pers_zero[len(pers_zero)//2]
+    # per[1] = pers_one[len(pers_one)//2]
+
     # alternate way to test:
     # prod = prod.max(1)
     # sum = np.sum(prod, axis=-1)
