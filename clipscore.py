@@ -123,23 +123,21 @@ class CLIPImageDataset(torch.utils.data.Dataset):
 
         # NEW: Random crop with random-sized crops
         #'''
-        for i in range(5):
-            rand_width = int((.75 + random.random() / 4) * width)
-            rand_height = int((.75 + random.random() / 4) * height)
-            transform = T.RandomResizedCrop((rand_width, rand_height))
-            img = transform(image)
-            images.append(img)
+        # for i in range(5):
+        #     rand_width = int((.75 + random.random() / 4) * width)
+        #     rand_height = int((.75 + random.random() / 4) * height)
+        #     transform = T.RandomResizedCrop((rand_width, rand_height))
+        #     img = transform(image)
+        #     images.append(img)
         #'''
 
         # NEW: k center crops decreasing by crop_sz in size each time
-        '''
         k = 5
         crop_sz = .1
         for i in range(k):
             crop = crop_sz * i
             img = image.crop((int(width*crop), int(height*crop), int(width*(1-crop)), int(height*(1-crop))))
             images.append(img)
-        '''
     
         for i in range(len(images)):
             images[i] = self.preprocess(images[i])
@@ -258,11 +256,11 @@ def get_clip_score(model, images, candidates, device, w=2.5):
         per = w*np.clip(np.sum(prod[:,i,:], axis=1), 0, None)
         pers.append(per)
 
-    for i in range(len(pers)): # gets max crop clipscore
-        if pers[i][0] > per[0]:
-            per[0] = pers[i][0] 
-        if pers[i][1] > per[1]:
-            per[1] = pers[i][1] 
+    # for i in range(len(pers)): # gets max crop clipscore
+    #     if pers[i][0] > per[0]:
+    #         per[0] = pers[i][0] 
+    #     if pers[i][1] > per[1]:
+    #         per[1] = pers[i][1] 
 
     # gets the min crop clipscore
     # for i in range(len(pers)):
@@ -272,10 +270,10 @@ def get_clip_score(model, images, candidates, device, w=2.5):
     #         per[1] = pers[i][1] 
 
     # gets the median crop clipscore
-    # pers_zero = [item[0] for item in pers]
-    # pers_one = [item[1] for item in pers]
-    # per[0] = pers_zero[len(pers_zero)//2]
-    # per[1] = pers_one[len(pers_one)//2]
+    pers_zero = [item[0] for item in pers]
+    pers_one = [item[1] for item in pers]
+    per[0] = pers_zero[len(pers_zero)//2]
+    per[1] = pers_one[len(pers_one)//2]
 
     # alternate way to test:
     # prod = prod.max(1)

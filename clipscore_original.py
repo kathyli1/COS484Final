@@ -87,9 +87,8 @@ class CLIPImageDataset(torch.utils.data.Dataset):
 
     def func(self, image):
         return image.convert("RGB")
-    
+
     def _transform_test(self, n_px):
-        #crop here
         return Compose([
             Resize(n_px, interpolation=Image.BICUBIC),
             CenterCrop(n_px),
@@ -102,21 +101,8 @@ class CLIPImageDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         c_data = self.data[idx]
         image = Image.open(c_data)
-        #image.show()
-        width, height = image.size
-        #img1 = img.crop((left, top, right, bottom)) #..torchussion.transforms.random_crop
-        img1 = image.crop((width//2, height//2, width, height))
-        img2 = image.crop((0, 0, width//2, height//2))
-        img3 = image.crop((width//2, 0, width, height//2))
-        img4 = image.crop((0, height//2, width//2, height))
         image = self.preprocess(image)
-        img1 = self.preprocess(img1)
-        img2 = self.preprocess(img2)
-        img3 = self.preprocess(img3)
-        img4 = self.preprocess(img4)
-        #img4.show()
         return {'image':image}
-        #return {'image':[img1,img2,img3,img4]}
 
     def __len__(self):
         return len(self.data)
@@ -137,8 +123,8 @@ def extract_all_captions(captions, model, device, batch_size=256, num_workers=8)
 
 def extract_all_images(images, model, device, batch_size=64, num_workers=8):
     data = torch.utils.data.DataLoader(
-    CLIPImageDataset(images),
-    batch_size=batch_size, num_workers=num_workers, shuffle=False)
+        CLIPImageDataset(images),
+        batch_size=batch_size, num_workers=num_workers, shuffle=False)
     all_image_features = []
     with torch.no_grad():
         for b in tqdm.tqdm(data):
@@ -146,33 +132,8 @@ def extract_all_images(images, model, device, batch_size=64, num_workers=8):
             if device == 'cuda':
                 b = b.to(torch.float16)
             all_image_features.append(model.encode_image(b).cpu().numpy())
-    
     all_image_features = np.vstack(all_image_features)
-    
     return all_image_features
-    # data = torch.utils.data.DataLoader(
-    #     CLIPImageDataset(images),
-    #     batch_size=batch_size, num_workers=num_workers, shuffle=False)
-
-    # all_image_features = []
-    # with torch.no_grad():
-    #     # for b in tqdm.tqdm(data):
-    #     #     print("b[image]", )
-    #     #     b = b['image'].to(device)
-    #     #     if device == 'cuda':
-    #     #         b = b.to(torch.float16)
-    #     #     all_image_features.append(model.encode_image(b).cpu().numpy())
-    #     for images in tqdm.tqdm(data):
-    #         im_feature_arr = []
-    #         for b in images['image']:
-    #             b = b.to(device)
-    #             if device == 'cuda':
-    #                 b = b.to(torch.float16)
-    #             im_feature_arr.append(model.encode_image(b).cpu().numpy())
-    #         all_image_features.append(im_feature_arr)
-
-    #     all_image_features = np.vstack(all_image_features)
-    # return all_image_features
 
 
 def get_clip_score(model, images, candidates, device, w=2.5):
@@ -198,9 +159,8 @@ def get_clip_score(model, images, candidates, device, w=2.5):
             'to exactly replicate paper results, please use numpy version less than 1.21, e.g., 1.20.3.')
         images = images / np.sqrt(np.sum(images**2, axis=1, keepdims=True))
         candidates = candidates / np.sqrt(np.sum(candidates**2, axis=1, keepdims=True))
-    
+
     per = w*np.clip(np.sum(images * candidates, axis=1), 0, None)
-    import pdb; pdb.set_trace()
     return np.mean(per), per, candidates
 
 
@@ -248,7 +208,6 @@ def get_refonlyclipscore(model, references, candidates, device):
 
 
 def main():
-
     args = parse_args()
 
     image_paths = [os.path.join(args.image_dir, path) for path in os.listdir(args.image_dir)
@@ -274,7 +233,6 @@ def main():
     model, transform = clip.load("ViT-B/32", device=device, jit=False)
     model.eval()
 
-    #problem
     image_feats = extract_all_images(
         image_paths, model, device, batch_size=64, num_workers=8)
 
@@ -296,7 +254,6 @@ def main():
         scores = {image_id: {'CLIPScore': float(clipscore)}
                   for image_id, clipscore in
                   zip(image_ids, per_instance_image_text)}
-        
         print('CLIPScore: {:.4f}'.format(np.mean([s['CLIPScore'] for s in scores.values()])))
 
     if args.references_json:
