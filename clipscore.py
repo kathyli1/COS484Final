@@ -272,6 +272,8 @@ def get_clip_score(model, images, candidates, device, w=2.5):
     # gets the median crop clipscore
     pers_zero = [item[0] for item in pers]
     pers_one = [item[1] for item in pers]
+    pers_zero.sort()
+    pers_one.sort()
     per[0] = pers_zero[len(pers_zero)//2]
     per[1] = pers_one[len(pers_one)//2]
 
