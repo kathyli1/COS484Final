@@ -113,11 +113,11 @@ class CLIPImageDataset(torch.utils.data.Dataset):
         # return {'image':image}
 
         # NEW: random crop with fixed size crop_size*width and crop_size*height
-        crop_size = .9
-        for i in range(4):
-            transform = T.RandomResizedCrop((int(width*crop_size),int(height*crop_size)))
-            img = transform(image)
-            images.append(img)
+        # crop_size = .9
+        # for i in range(4):
+        #     transform = T.RandomResizedCrop((int(width*crop_size),int(height*crop_size)))
+        #     img = transform(image)
+        #     images.append(img)
 
         # NEW: Random crop with random-sized crops
         #'''
@@ -130,12 +130,12 @@ class CLIPImageDataset(torch.utils.data.Dataset):
         #'''
 
         # NEW: k center crops decreasing by crop_sz in size each time
-        # k = 5
-        # crop_sz = .1
-        # for i in range(k):
-        #     crop = crop_sz * i
-        #     img = image.crop((int(width*crop), int(height*crop), int(width*(1-crop)), int(height*(1-crop))))
-        #     images.append(img)
+        k = 5
+        crop_sz = .1
+        for i in range(k):
+            crop = crop_sz * i
+            img = image.crop((int(width*crop), int(height*crop), int(width*(1-crop)), int(height*(1-crop))))
+            images.append(img)
     
         for i in range(len(images)):
             images[i] = self.preprocess(images[i])
@@ -255,22 +255,22 @@ def get_clip_score(model, images, candidates, device, w=2.5):
         pers.append(per)
 
     # gets max crop clipscore
-    # for image in range(len(pers)):
-    #     for crop in range(len(per[image])):
-    #         if pers[image][crop] > per[image]:
-    #             per[image] = pers[image][crop]
+    for crop in range(len(pers)):
+        for image in range(len(per)):
+            if pers[crop][image] > per[image]:
+                per[image] = pers[crop][image]
 
-    # gets the min crop clipscore
-    # for image in range(len(pers)): 
-    #     for crop in range(len(per[image])):
-    #         if pers[image][crop] < per[image]:
-    #             per[image] = pers[image][crop]
+    # gets min crop clipscore
+    # for crop in range(len(pers)):
+    #     for image in range(len(per)):
+    #         if pers[crop][image] < per[image]:
+    #             per[image] = pers[crop][image]
 
     # gets the median crop clipscore
-    for i in range(len(per)):
-        crops = [crop[i] for crop in pers]
-        crops.sort()
-        per[i] = crops[len(crops)//2]
+    # for i in range(len(per)):
+    #     crops = [crop[i] for crop in pers]
+    #     crops.sort()
+    #     per[i] = crops[len(crops)//2]
 
     # alternate way to test:
     # prod = prod.max(1)
