@@ -5,6 +5,10 @@ Code for CLIPScore (https://arxiv.org/abs/2104.08718)
   author={Hessel, Jack and Holtzman, Ari and Forbes, Maxwell and Bras, Ronan Le and Choi, Yejin},
   booktitle={EMNLP},
   year={2021}
+
+This file contains the original code used in the paper (CLIPScore: A Reference-free Evaluation 
+Metric for Image Captioning). We used this code to regenerate the baseline results that we compared
+against our altered clipscore methods.
 }
 '''
 import argparse

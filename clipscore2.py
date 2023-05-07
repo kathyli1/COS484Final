@@ -1,11 +1,7 @@
 '''
-Code for CLIPScore (https://arxiv.org/abs/2104.08718)
-@inproceedings{hessel2021clipscore,
- title={{CLIPScore:} A Reference-free Evaluation Metric for Image Captioning},
- author={Hessel, Jack and Holtzman, Ari and Forbes, Maxwell and Bras, Ronan Le and Choi, Yejin},
- booktitle={EMNLP},
- year={2021}
-}
+This file contains the code for our second method of altering CLIPScore: Combining Feature Weights of Varied
+Crops per Image (4.3). The methods we made changes in are __getitem__ in the CLIPImageDataset class and 
+extract_all_images. Note: all changes commented with "NEW".
 '''
 
 # VERSION that combines feature weights of crops
@@ -136,7 +132,7 @@ class CLIPImageDataset(torch.utils.data.Dataset):
        # return {'image':image}
 
 
-       # NEW: random crop with fixed size crop_size*width and crop_size*height
+       # NEW: fixed size random crop of size crop_size*width and crop_size*height
        crop_size = .9
        for i in range(4):
            transform = T.RandomResizedCrop((int(width*crop_size),int(height*crop_size)))
@@ -144,7 +140,7 @@ class CLIPImageDataset(torch.utils.data.Dataset):
            images.append(img)
 
 
-       # NEW: Random crop with random-sized crops
+       # NEW: Random-sized random crop
        # for i in range(5):
        #     rand_width = int((.75 + random.random() / 4) * width)
        #     rand_height = int((.75 + random.random() / 4) * height)
@@ -196,14 +192,11 @@ def extract_all_images(images, model, device, batch_size=64, num_workers=1):
 
    all_image_features = []
    with torch.no_grad():
-       # for b in tqdm.tqdm(data):
-       #     print("b[image]", )
-       #     b = b['image'].to(device)
-       #     if device == 'cuda':
-       #         b = b.to(torch.float16)
-       #     all_image_features.append(model.encode_image(b).cpu().numpy())
+      
        for images in tqdm.tqdm(data):
            im_feature_arr = []
+
+           # NEW: additional loop to deal with multiple crops per image
            for b in images['image']:
                b = b.to(device)
                if device == 'cuda':
@@ -211,7 +204,7 @@ def extract_all_images(images, model, device, batch_size=64, num_workers=1):
                im_feature_arr.append(model.encode_image(b).cpu().numpy())
 
 
-           # MAX feature - .7147
+           # NEW: Creates features array using MAX over each position of the crop feature vectors
            # features = im_feature_arr[0]
            # for arr in im_feature_arr:
            #     for i in range(len(arr)):
@@ -219,7 +212,7 @@ def extract_all_images(images, model, device, batch_size=64, num_workers=1):
            #             features[i][j] = max(features[i][j], arr[i][j])
           
           
-           # MIN feature - .7227
+           # NEW: Creates features array using MIN over each position of the crop feature vectors
            # features = im_feature_arr[0]
            # for arr in im_feature_arr:
            #     for i in range(len(arr)):
@@ -228,8 +221,7 @@ def extract_all_images(images, model, device, batch_size=64, num_workers=1):
           
 
 
-           # MEAN feature - .7760
-           #'''
+           # NEW: Creates features array using MEAN over each position of the crop feature vectors
            features = np.zeros((len(im_feature_arr[0]), len(im_feature_arr[0][0])))
            num = 0
            for arr in im_feature_arr:
@@ -240,7 +232,6 @@ def extract_all_images(images, model, device, batch_size=64, num_workers=1):
            for i in range(len(features)):
                for j in range(len(features[i])):
                    features[i][j] /= num
-           #'''
 
 
            all_image_features.append(features)

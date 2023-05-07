@@ -1,11 +1,7 @@
 '''
-Code for CLIPScore (https://arxiv.org/abs/2104.08718)
-@inproceedings{hessel2021clipscore,
-  title={{CLIPScore:} A Reference-free Evaluation Metric for Image Captioning},
-  author={Hessel, Jack and Holtzman, Ari and Forbes, Maxwell and Bras, Ronan Le and Choi, Yejin},
-  booktitle={EMNLP},
-  year={2021}
-}
+This file contains the code for our first method of altering CLIPScore: Comparing Image Crop CLIPScores (4.2).
+The methods we made changes in are __getitem__ in the CLIPImageDataset class, extract_all_images,
+and get_clip_score. Note: all changes commented with "NEW".
 '''
 import argparse
 import clip
@@ -112,30 +108,30 @@ class CLIPImageDataset(torch.utils.data.Dataset):
         # image = self.preprocess(imgage)
         # return {'image':image}
 
-        # NEW: random crop with fixed size crop_size*width and crop_size*height
+        # NEW: fixed size random crop of size crop_size*width and crop_size*height
         # crop_size = .9
         # for i in range(4):
         #     transform = T.RandomResizedCrop((int(width*crop_size),int(height*crop_size)))
         #     img = transform(image)
         #     images.append(img)
 
-        # NEW: Random crop with random-sized crops
+        # NEW: Random-sized random crop
         #'''
-        # for i in range(5):
-        #     rand_width = int((.75 + random.random() / 4) * width)
-        #     rand_height = int((.75 + random.random() / 4) * height)
-        #     transform = T.RandomResizedCrop((rand_width, rand_height))
-        #     img = transform(image)
-        #     images.append(img)
+        for i in range(5):
+            rand_width = int((.75 + random.random() / 4) * width)
+            rand_height = int((.75 + random.random() / 4) * height)
+            transform = T.RandomResizedCrop((rand_width, rand_height))
+            img = transform(image)
+            images.append(img)
         #'''
 
         # NEW: k center crops decreasing by crop_sz in size each time
-        k = 5
-        crop_sz = .1
-        for i in range(k):
-            crop = crop_sz * i
-            img = image.crop((int(width*crop), int(height*crop), int(width*(1-crop)), int(height*(1-crop))))
-            images.append(img)
+        # k = 5
+        # crop_sz = .1
+        # for i in range(k):
+        #     crop = crop_sz * i
+        #     img = image.crop((int(width*crop), int(height*crop), int(width*(1-crop)), int(height*(1-crop))))
+        #     images.append(img)
     
         for i in range(len(images)):
             images[i] = self.preprocess(images[i])
@@ -168,48 +164,15 @@ def extract_all_images(images, model, device, batch_size=64, num_workers=1):
     with torch.no_grad():
         for images in tqdm.tqdm(data):
             im_feature_arr = []
-            # Nika's testing here:
-            # MAX feature - .7147
-            '''
-            features = im_feature_arr[0]
-            for arr in im_feature_arr:
-                for i in range(len(arr)):
-                    for j in range(len(arr[i])):
-                        features[i][j] = max(features[i][j], arr[i][j])
-            '''
-            # MIN feature - .7227
-            '''
-            features = im_feature_arr[0]
-            for arr in im_feature_arr:
-                for i in range(len(arr)):
-                    for j in range(len(arr[i])):
-                        features[i][j] = min(features[i][j], arr[i][j])
-            '''
-            # MEAN feature - .7760
-            '''
-            features = np.zeros((len(im_feature_arr[0]), len(im_feature_arr[0][0])))
-            num = 0
-            for arr in im_feature_arr:
-                num += 1
-                for i in range(len(arr)):
-                    for j in range(len(arr[i])):
-                        features[i][j] += arr[i][j]
-            for i in range(len(features)):
-                for j in range(len(features[i])):
-                    features[i][j] /= num
-            '''
 
+            # NEW: additional loop to deal with multiple crops per image
             for b in images['image']:
                 b = b.to(device)
                 if device == 'cuda':
                     b = b.to(torch.float16)
                 im_feature_arr.append(model.encode_image(b).cpu().numpy())
 
-            # print(len(im_feature_arr))
-            # print(len(im_feature_arr[0]))
-            # print(len(im_feature_arr[0][0]))
             im_feature_arr = np.stack(im_feature_arr, axis=1)
-            # print(im_feature_arr.shape)
             all_image_features.append(im_feature_arr)
         all_image_features = np.vstack(all_image_features)
 
@@ -242,35 +205,31 @@ def get_clip_score(model, images, candidates, device, w=2.5):
         candidates = candidates / \
             np.sqrt(np.sum(candidates**2, axis=-1, keepdims=True))
 
-    # print(images.shape)
-    # print(candidates.shape)
     prod = images * candidates
-    # import pdb; pdb.set_trace() #how to debug
-    # make crop combining changes here
-    #prod = prod.mean(1) # mean results in clipscore below 1
-    # print(prod.shape)
+
+    # NEW: Compute CLIPScores for each crop of each image
     pers = []
     for i in range(prod.shape[1]):
         per = w*np.clip(np.sum(prod[:,i,:], axis=1), 0, None)
         pers.append(per)
 
-    # gets max crop clipscore
-    for crop in range(len(pers)):
-        for image in range(len(per)):
-            if pers[crop][image] > per[image]:
-                per[image] = pers[crop][image]
+    # NEW: Chooses MAX CLIPScore out of the crop CLIPScores
+    # for crop in range(len(pers)):
+    #     for image in range(len(per)):
+    #         if pers[crop][image] > per[image]:
+    #             per[image] = pers[crop][image]
 
-    # gets min crop clipscore
+    # NEW: Chooses MIN CLIPScore out of the crop CLIPScores
     # for crop in range(len(pers)):
     #     for image in range(len(per)):
     #         if pers[crop][image] < per[image]:
     #             per[image] = pers[crop][image]
 
-    # gets the median crop clipscore
-    # for i in range(len(per)):
-    #     crops = [crop[i] for crop in pers]
-    #     crops.sort()
-    #     per[i] = crops[len(crops)//2]
+    # NEW: Chooses MEDIAN CLIPScore out of the crop CLIPScores
+    for i in range(len(per)):
+        crops = [crop[i] for crop in pers]
+        crops.sort()
+        per[i] = crops[len(crops)//2]
 
     # alternate way to test:
     # prod = prod.max(1)
@@ -376,7 +335,7 @@ def main():
                   for image_id, clipscore in
                   zip(image_ids, per_instance_image_text)}
         
-        # prints individual clip scores for each image
+        # Prints individual clip scores for each image
         #for s in scores.values():
         #    print(s['CLIPScore'])
         
