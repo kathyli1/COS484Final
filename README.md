@@ -1,3 +1,12 @@
+# What is different for our paper (Optimizing Clipscore via Image Cropping)?
+
+We altered the clipscore.py and clipscore2.py files. The original paper clipscore.py code
+is in the clipscore_original.py file. The clipscore.py file contains the code for the 
+Comparing Image Crop CLIPScores model variant (4.2) and the clipscore2.py file contains the 
+code for the Combining Feature Weights of Varied Crops per Image method (4.3).
+
+# Below: original README for the original CLIPScore paper
+
 # What's in here?
 
 This repo contains the code for our EMNLP 2021 paper: [CLIPScore: A
